@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- Regula globală: interzice cleartext (HTTP) peste tot -->
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <!-- Backend Fly.io: certificate pinning SHA-256 -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">fleet-telemetry-licenta.fly.dev</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+    <!--
+      Pin primar  : cheia publică a certificatului *.fly.dev (Let's Encrypt E8)
+      Pin backup  : cheia publică a CA intermediar Let's Encrypt E8
+      Expiră      : 2027-04-23 (reînnoiește la fiecare reînnoire cert Fly.io)
+      Recalculare : openssl s_client -showcerts -connect fleet-telemetry-licenta.fly.dev:443
+                    | openssl x509 -noout -pubkey | openssl pkey -pubin -outform DER
+                    | openssl dgst -sha256 -binary | base64
+    -->
+    <pin-set expiration="2027-04-23">
+      <pin digest="SHA-256">DupwNooNpQFKjgFX//jA83c6gddqRTPS7xYjBOM1mg8=</pin>
+      <pin digest="SHA-256">iFvwVyJSxnQdyaUvUERIf+8qk7gRze3612JMwoO3zdU=</pin>
+    </pin-set>
+  </domain-config>
+</network-security-config>
