@@ -2,8 +2,39 @@
 // Citește GOOGLE_MAPS_API_KEY din process.env:
 //   • Dev local / Expo Go  → din fleet-app/.env
 //   • EAS Cloud Build      → din EAS secret injectat automat
+//
+// VARIANT controlează care "aromă" se compilează:
+//   VARIANT=road npx expo run:ios    → FleetRoad (violet, mașini)
+//   VARIANT=aqua npx expo run:ios    → FleetAqua (cyan, bărci)
 
 const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
+const variant  = (process.env.VARIANT || 'road').toLowerCase();
+
+// slug-ul EAS NU se schimbă — e legat de projectId-ul înregistrat.
+// Două apps pe Store = două proiecte EAS separate (creat cu `eas init` pe un branch nou).
+// Deocamdată ambele variante folosesc același proiect EAS; bundle ID-ul le separă pe Store.
+const VARIANT_META = {
+  road: {
+    name: 'FleetRoad',
+    slug: 'licenta-saas-fleet-telemetry',  // slug înregistrat EAS
+    iosBundleId: 'com.fleettelemetry.road',
+    androidPackage: 'com.fleettelemetry.road',
+    icon: './assets/icon.png',
+    splashBg: '#07010F',
+    notifColor: '#7B2FBE',
+  },
+  aqua: {
+    name: 'FleetAqua',
+    slug: 'licenta-saas-fleet-telemetry',  // același slug EAS, bundle ID diferit
+    iosBundleId: 'com.fleettelemetry.aqua',
+    androidPackage: 'com.fleettelemetry.aqua',
+    icon: './assets/icon-aqua.png',
+    splashBg: '#010D14',
+    notifColor: '#0891B2',
+  },
+};
+
+const meta = VARIANT_META[variant] ?? VARIANT_META.road;
 
 if (!mapsKey) {
   console.warn(
@@ -12,23 +43,25 @@ if (!mapsKey) {
   );
 }
 
+console.log(`\n📦 Building variant: ${meta.name} (${variant})\n`);
+
 module.exports = {
   expo: {
-    name: 'fleet-app',
-    slug: 'licenta-saas-fleet-telemetry',
+    name: meta.name,
+    slug: meta.slug,
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: meta.icon,
     userInterfaceStyle: 'light',
-    newArchEnabled: false,
+    newArchEnabled: true,
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#ffffff',
+      backgroundColor: meta.splashBg,
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.adibasa.licentasaasfleettelemetry',
+      bundleIdentifier: meta.iosBundleId,
       config: {
         googleMapsApiKey: mapsKey,
       },
@@ -47,7 +80,7 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       enableProguardInReleaseBuilds: true,
-      package: 'com.adibasa.licentasaasfleettelemetry',
+      package: meta.androidPackage,
       allowBackup: false,
       usesCleartextTraffic: false,
       config: {
@@ -84,6 +117,7 @@ module.exports = {
       favicon: './assets/favicon.png',
     },
     extra: {
+      variant,   // ← disponibil în app via Constants.expoConfig.extra.variant
       eas: {
         projectId: '8db9dbc4-2b74-423f-8056-b9e097ab6623',
       },
@@ -103,8 +137,8 @@ module.exports = {
       [
         'expo-notifications',
         {
-          icon: './assets/icon.png',
-          color: '#FF5E00',
+          icon: meta.icon,
+          color: meta.notifColor,
           sounds: [],
         },
       ],

@@ -6,6 +6,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T, SHADOW } from '../theme';
 
 const SEVERITY = {
@@ -15,7 +18,9 @@ const SEVERITY = {
 };
 
 export default function AlertsScreen() {
-  const { token } = useAuth();
+  const navigation = useNavigation();
+  const { top }    = useSafeAreaInsets();
+  const { token }  = useAuth();
   const [alerts,    setAlerts]    = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [refreshing,setRefreshing]= useState(false);
@@ -73,7 +78,10 @@ export default function AlertsScreen() {
 
   return (
     <LinearGradient colors={[T.bg, '#0F0328']} style={{ flex: 1 }}>
-      <LinearGradient colors={['#1A0B3E', '#0E0428']} style={s.header}>
+      <LinearGradient colors={['#1A0B3E', '#0E0428']} style={[s.header, { paddingTop: top + 52 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: 4 }}>
+          <Ionicons name="chevron-back" size={26} color={T.white} />
+        </TouchableOpacity>
         <Text style={s.title}>🚨 Alerte Flotă</Text>
         <Text style={s.sub}>{alerts.length} evenimente · ultimele 48h</Text>
       </LinearGradient>
@@ -99,7 +107,7 @@ export default function AlertsScreen() {
 
 const s = StyleSheet.create({
   centered:   { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  header:     { padding: 20, paddingTop: 52 },
+  header:     { padding: 20 },
   title:      { color: T.white, fontSize: 22, fontWeight: 'bold' },
   sub:        { color: T.muted, fontSize: 13, marginTop: 4 },
   loadTxt:    { color: T.accent, marginTop: 12, fontSize: 14 },

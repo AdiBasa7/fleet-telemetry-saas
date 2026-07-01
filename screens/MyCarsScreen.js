@@ -7,6 +7,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL, POLLING_INTERVAL_MS } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { T, SHADOW } from '../theme';
@@ -223,6 +224,7 @@ function VehicleCard({ device, onEdit }) {
 
 // ── Ecran principal ───────────────────────────────────
 export default function MyCarsScreen() {
+  const { top }                     = useSafeAreaInsets();
   const { token }                   = useAuth();
   const [devices, setDevices]       = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -269,7 +271,7 @@ export default function MyCarsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={scrS.hero}>
+      <View style={[scrS.hero, { paddingTop: top + 52 }]}>
         <Text style={[scrS.decoCar, { right: -10, top: -10, fontSize: 110, opacity: 0.06 }]}>🚗</Text>
         <Text style={[scrS.decoCar, { right: 80, top: 20, fontSize: 50, opacity: 0.04, transform: [{ rotate: '-15deg' }] }]}>🏎️</Text>
         <Text style={[scrS.decoCar, { left: -20, bottom: -20, fontSize: 90, opacity: 0.05, transform: [{ scaleX: -1 }] }]}>🚙</Text>
@@ -325,7 +327,7 @@ const scrS = StyleSheet.create({
   errorTxt:     { color: T.red, fontSize: 14, textAlign: 'center', marginVertical: 16 },
   retryBtn:     { backgroundColor: T.primary, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24 },
   retryTxt:     { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  hero:         { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 28, overflow: 'hidden', position: 'relative', backgroundColor: 'rgba(15, 5, 40, 0.65)' },
+  hero:         { paddingHorizontal: 24, paddingTop: 52, paddingBottom: 28, overflow: 'hidden', position: 'relative', backgroundColor: 'rgba(15, 5, 40, 0.65)' },
   decoCar:      { position: 'absolute' },
   heroContent:  { position: 'relative', zIndex: 1 },
   heroTitle:    { color: T.white, fontSize: 26, fontWeight: 'bold' },

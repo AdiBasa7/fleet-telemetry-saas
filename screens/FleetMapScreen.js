@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, FlatList } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { API_BASE_URL, POLLING_INTERVAL_MS } from '../config';
@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { T } from '../theme';
 
 export default function FleetMapScreen({ navigation }) {
+  const { top }                 = useSafeAreaInsets();
   const { token }               = useAuth();
   const [devices, setDevices]   = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -97,7 +98,7 @@ export default function FleetMapScreen({ navigation }) {
       </MapView>
 
       {/* Badge top-right */}
-      <TouchableOpacity style={s.badgeWrap} onPress={() => setShowList(true)} activeOpacity={0.85}>
+      <TouchableOpacity style={[s.badgeWrap, { top: top + 48 }]} onPress={() => setShowList(true)} activeOpacity={0.85}>
         <LinearGradient colors={T.grad} style={s.badge}>
           <Text style={s.badgeTxt}>🚗 {activeCount}/{devices.length} active</Text>
         </LinearGradient>
@@ -180,7 +181,7 @@ const s = StyleSheet.create({
   calloutRow:  { fontSize: 13, color: '#444', marginBottom: 2 },
   calloutKill: { color: '#d32f2f', fontWeight: 'bold', marginTop: 2 },
   calloutLink: { color: T.primary, marginTop: 6, fontSize: 12 },
-  badgeWrap:   { position: 'absolute', top: 14, right: 14 },
+  badgeWrap:   { position: 'absolute', right: 14 },
   badge:       { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22, shadowColor: T.glow, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
   badgeTxt:    { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   bottomOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 40, paddingBottom: 20, paddingHorizontal: 8 },

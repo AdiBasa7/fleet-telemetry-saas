@@ -20,6 +20,8 @@ import * as Print         from 'expo-print';
 import * as Sharing       from 'expo-sharing';
 import { API_BASE_URL }   from '../config';
 import { useAuth }        from '../context/AuthContext';
+import { useNavigation }  from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T, SHADOW }      from '../theme';
 
 const { width: W } = Dimensions.get('window');
@@ -156,6 +158,56 @@ function DatePickerModal({ visible, title, initial, onConfirm, onCancel }) {
 }
 
 // ─────────────────────────────────────────────────────
+//  VehiclePickerModal — alege mașina din flotă
+// ─────────────────────────────────────────────────────
+function VehiclePickerModal({ visible, devices, selectedImei, onSelect, onCancel }) {
+  return (
+    <Modal transparent animationType="slide" visible={visible} onRequestClose={onCancel}>
+      <View style={vp.overlay}>
+        <View style={vp.sheet}>
+          <LinearGradient colors={['#1C0D40', '#110626']} style={vp.inner}>
+            <View style={vp.handle} />
+            <Text style={vp.title}>Selectează vehiculul</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+              {devices.map(d => {
+                const plate   = d.vehicle?.licensePlate || d.imei;
+                const model   = [d.vehicle?.make, d.vehicle?.model].filter(v => v && v !== 'Necunoscut').join(' ') || 'Necunoscut';
+                const active  = d.imei === selectedImei;
+                return (
+                  <TouchableOpacity
+                    key={d.imei}
+                    style={[vp.row, active && vp.rowActive]}
+                    onPress={() => onSelect(d)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[vp.iconBox, { backgroundColor: active ? T.primary + '33' : 'rgba(123,47,190,0.1)' }]}>
+                      <Text style={{ fontSize: 20 }}>🚗</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[vp.plate, active && { color: T.accent }]}>{plate}</Text>
+                      <Text style={vp.model}>{model}</Text>
+                    </View>
+                    {active && <Ionicons name="checkmark-circle" size={20} color={T.accent} />}
+                    {d.isConnected && (
+                      <View style={vp.onlineDot} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity style={vp.cancelBtn} onPress={onCancel}>
+              <Text style={vp.cancelTxt}>Anulează</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────
 //  LegendRow animat
 // ─────────────────────────────────────────────────────
 function LegendRow({ label, desc, minutes, percent, isMax, delay }) {
@@ -184,26 +236,53 @@ function LegendRow({ label, desc, minutes, percent, isMax, delay }) {
 //  Ecran principal
 // ─────────────────────────────────────────────────────
 export default function RpmReportScreen({ route }) {
-  const { token } = useAuth();
-  const { imei, plate } = route?.params || {};
+  const navigation = useNavigation();
+  const { top }    = useSafeAreaInsets();
+  const { token }  = useAuth();
+  const params = route?.params || {};
+
+  // Vehicul selectat (iniția din params dacă vine din TripsScreen)
+  const [selImei,  setSelImei]  = useState(params.imei  || null);
+  const [selPlate, setSelPlate] = useState(params.plate || null);
+
+  // Lista flotei + modal selector
+  const [devices,      setDevices]      = useState([]);
+  const [showVehicles, setShowVehicles] = useState(false);
 
   // Date selectate
   const [startD, setStartD] = useState(firstOfMonthParts());
   const [endD,   setEndD]   = useState(todayParts());
 
   // Picker modal state
-  const [pickerFor,   setPickerFor]   = useState(null); // 'start' | 'end' | null
+  const [pickerFor,   setPickerFor]   = useState(null);
   const [pickerDraft, setPickerDraft] = useState(null);
 
   // Date raport
-  const [data,        setData]        = useState(null);
-  const [loading,     setLoading]     = useState(false);
-  const [exporting,   setExporting]   = useState(false);
+  const [data,      setData]      = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, []);
+
+  // Fetch lista flotei
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/devices`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(j => {
+        if (j.success) {
+          setDevices(j.data);
+          // Dacă nu avem vehicul selectat, alegem primul din flotă
+          if (!selImei && j.data.length > 0) {
+            setSelImei(j.data[0].imei);
+            setSelPlate(j.data[0].vehicle?.licensePlate || j.data[0].imei);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [token]);
 
   // ── Fetch raport ──────────────────────────────────────
   // TODO: conectare backend
@@ -213,34 +292,31 @@ export default function RpmReportScreen({ route }) {
   //   1. Șterge blocul "MOCK" de mai jos
   //   2. Decomentează blocul "REAL" de sub el
   const loadData = useCallback(async () => {
+    if (!selImei) { Alert.alert('Atenție', 'Selectează mai întâi un vehicul.'); return; }
     setLoading(true);
     setData(null);
     try {
-      // ── [MOCK] ─────────────────────────────────────
-      await new Promise(r => setTimeout(r, 700));
-      setData(MOCK_DATA);
-
-      // ── [REAL] decomentează când backend-ul e gata ─
-      // const resp = await fetch(
-      //   `${API_BASE_URL}/devices/${imei}/trips/rpm-report` +
-      //   `?startDate=${dateToIso(startD)}&endDate=${dateToIso(endD)}`,
-      //   { headers: { Authorization: `Bearer ${token}` } },
-      // );
-      // const json = await resp.json();
-      // if (!json.success) throw new Error(json.error || 'Eroare server');
-      // setData(json);
+      const resp = await fetch(
+        `${API_BASE_URL}/devices/${selImei}/trips/rpm-report` +
+        `?startDate=${dateToIso(startD)}&endDate=${dateToIso(endD)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const json = await resp.json();
+      if (!json.success) throw new Error(json.error || 'Eroare server');
+      setData(json);
     } catch (e) {
       Alert.alert('Eroare', e.message);
     } finally {
       setLoading(false);
     }
-  }, [startD, endD, imei, token]);
+  }, [startD, endD, selImei, token]);
 
   // ── Export PDF ────────────────────────────────────────
   const exportPDF = async () => {
     if (!data) return;
     setExporting(true);
     try {
+      const plate    = selPlate || selImei || '—';
       const maxMin   = Math.max(...data.classes.map(c => c.minutes), 1);
       const totalH   = Math.floor(data.totalMinutes / 60);
       const totalMin = Math.round(data.totalMinutes % 60);
@@ -382,7 +458,21 @@ export default function RpmReportScreen({ route }) {
   // ── Render ────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
-      {/* Picker modal */}
+      {/* Modal selector vehicul */}
+      <VehiclePickerModal
+        visible={showVehicles}
+        devices={devices}
+        selectedImei={selImei}
+        onSelect={d => {
+          setSelImei(d.imei);
+          setSelPlate(d.vehicle?.licensePlate || d.imei);
+          setShowVehicles(false);
+          setData(null);
+        }}
+        onCancel={() => setShowVehicles(false)}
+      />
+
+      {/* Modal selector date */}
       <DatePickerModal
         visible={!!pickerFor}
         title={pickerFor === 'start' ? 'Data de început' : 'Data de sfârșit'}
@@ -400,13 +490,28 @@ export default function RpmReportScreen({ route }) {
 
         {/* ── Header vehicul ── */}
         <Animated.View style={{ opacity: headerAnim }}>
-          <LinearGradient colors={['#0E0428', '#1C0D40', T.bg]} style={s.header}>
+          <LinearGradient colors={['#0E0428', '#1C0D40', T.bg]} style={[s.header, { paddingTop: top + 52 }]}>
             <View style={s.circle1} /><View style={s.circle2} />
+            <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+              <Ionicons name="chevron-back" size={26} color={T.white} />
+            </TouchableOpacity>
             <View style={s.headerInner}>
               <View style={s.headerBadge}>
                 <Text style={s.headerBadgeTxt}>📊 RAPORT TURAȚII</Text>
               </View>
-              <Text style={s.headerPlate}>{plate || '— —'}</Text>
+
+              {/* Buton selector mașină */}
+              <TouchableOpacity
+                style={s.vehicleSelector}
+                onPress={() => setShowVehicles(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.headerPlate}>{selPlate || '— —'}</Text>
+                <View style={s.changeBadge}>
+                  <Ionicons name="swap-horizontal" size={14} color={T.accent} />
+                  <Text style={s.changeTxt}>schimbă</Text>
+                </View>
+              </TouchableOpacity>
             </View>
           </LinearGradient>
         </Animated.View>
@@ -587,9 +692,10 @@ const s = StyleSheet.create({
 
   // Header
   header: {
-    paddingTop: 56, paddingBottom: 32, paddingHorizontal: 24,
+    paddingBottom: 32, paddingHorizontal: 24,
     overflow: 'hidden', position: 'relative',
   },
+  backBtn: { marginBottom: 8 },
   circle1: {
     position: 'absolute', width: 200, height: 200, borderRadius: 100,
     backgroundColor: T.accent, opacity: 0.06, top: -50, right: -40,
@@ -606,6 +712,15 @@ const s = StyleSheet.create({
   },
   headerBadgeTxt: { color: T.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   headerPlate:    { color: T.white, fontSize: 30, fontWeight: '900', letterSpacing: 2 },
+  vehicleSelector: { marginTop: 4 },
+  changeBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(168,85,247,0.15)',
+    borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)',
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  changeTxt: { color: T.accent, fontSize: 11, fontWeight: '700' },
 
   // Card
   card: {
@@ -695,6 +810,53 @@ const legS = StyleSheet.create({
   right:   { alignItems: 'flex-end' },
   minutes: { color: T.white, fontSize: 15, fontWeight: '800' },
   percent: { color: T.muted, fontSize: 11, marginTop: 1 },
+});
+
+// ─────────────────────────────────────────────────────
+//  Stiluri vehicle picker modal
+// ─────────────────────────────────────────────────────
+const vp = StyleSheet.create({
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  sheet:  { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', ...SHADOW },
+  inner:  { paddingHorizontal: 20, paddingBottom: 36, paddingTop: 16 },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center', marginBottom: 16,
+  },
+  title:  { color: T.white, fontSize: 16, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 12,
+    borderRadius: 14, marginBottom: 6,
+    backgroundColor: 'rgba(123,47,190,0.08)',
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  rowActive: {
+    borderColor: 'rgba(168,85,247,0.4)',
+    backgroundColor: 'rgba(168,85,247,0.12)',
+  },
+  iconBox: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  plate:   { color: T.white, fontSize: 15, fontWeight: '800' },
+  model:   { color: T.muted, fontSize: 12, marginTop: 2 },
+  onlineDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: T.green, marginLeft: 4,
+  },
+  cancelBtn: {
+    marginTop: 12, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: T.border,
+    alignItems: 'center',
+  },
+  cancelTxt: { color: T.muted, fontWeight: '700', fontSize: 14 },
 });
 
 // ─────────────────────────────────────────────────────

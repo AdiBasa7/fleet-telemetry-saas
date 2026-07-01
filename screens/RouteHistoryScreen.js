@@ -4,6 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from '../theme';
 
 const PERIODS = [
@@ -13,6 +15,8 @@ const PERIODS = [
 ];
 
 export default function RouteHistoryScreen({ route }) {
+  const navigation  = useNavigation();
+  const { top }     = useSafeAreaInsets();
   const { device }  = route.params;
   const { token }   = useAuth();
   const [records, setRecords]   = useState([]);
@@ -51,6 +55,14 @@ export default function RouteHistoryScreen({ route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
+      {/* Header */}
+      <LinearGradient colors={['#1A0B3E', T.bg]} style={[s.headerRow, { paddingTop: top + 52 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+          <Text style={s.backTxt}>{'‹'}</Text>
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Traseu · {device?.vehicle?.licensePlate || '—'}</Text>
+      </LinearGradient>
+
       {/* Selector perioadă */}
       <LinearGradient colors={['#1A0B3E', T.bg]} style={s.periodWrap}>
         {PERIODS.map(p => (
@@ -109,6 +121,10 @@ export default function RouteHistoryScreen({ route }) {
 }
 
 const s = StyleSheet.create({
+  headerRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10, gap: 8 },
+  backBtn:     { padding: 4 },
+  backTxt:     { color: '#fff', fontSize: 32, lineHeight: 34 },
+  headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', flex: 1 },
   periodWrap:  { flexDirection: 'row', padding: 10, gap: 8 },
   periodBtn:   { flex: 1, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: T.border, alignItems: 'center' },
   periodBtnA:  { borderColor: T.primary, backgroundColor: T.primary + '33' },

@@ -10,15 +10,43 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "android": { "buildType": "apk" }
+    },
+    "road": {
+      "env": { "VARIANT": "road" },
+      "autoIncrement": true,
+      "ios": { "buildConfiguration": "Release" },
+      "android": { "buildType": "app-bundle" }
+    },
+    "road-apk": {
+      "distribution": "internal",
+      "env": { "VARIANT": "road" },
+      "android": { "buildType": "apk" }
+    },
+    "aqua": {
+      "env": { "VARIANT": "aqua" },
+      "autoIncrement": true,
+      "ios": { "buildConfiguration": "Release" },
+      "android": { "buildType": "app-bundle" }
+    },
+    "aqua-apk": {
+      "distribution": "internal",
+      "env": { "VARIANT": "aqua" },
+      "android": { "buildType": "apk" }
     },
     "production": {
+      "env": { "VARIANT": "road" },
       "autoIncrement": true
     }
   },
   "submit": {
-    "production": {}
+    "road": {
+      "ios": { "appleId": "your@apple.com", "ascAppId": "ROAD_APP_ID" },
+      "android": { "serviceAccountKeyPath": "./play-store-key.json", "track": "production" }
+    },
+    "aqua": {
+      "ios": { "appleId": "your@apple.com", "ascAppId": "AQUA_APP_ID" },
+      "android": { "serviceAccountKeyPath": "./play-store-key.json", "track": "production" }
+    }
   }
 }

@@ -13,6 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T, SHADOW } from '../theme';
 
 const TYPES = ['ITP', 'RCA', 'CASCO', 'Revizie', 'Schimb ulei', 'Anvelope', 'Altele'];
@@ -139,7 +141,9 @@ function AddModal({ visible, imei, token, onClose, onSaved }) {
 }
 
 export default function MaintenanceScreen() {
-  const { token } = useAuth();
+  const navigation = useNavigation();
+  const { top }    = useSafeAreaInsets();
+  const { token }  = useAuth();
   const [devices,   setDevices]   = useState([]);
   const [selImei,   setSelImei]   = useState(null);
   const [reminders, setReminders] = useState([]);
@@ -181,7 +185,10 @@ export default function MaintenanceScreen() {
 
   return (
     <LinearGradient colors={[T.bg, '#0F0328']} style={{ flex: 1 }}>
-      <LinearGradient colors={['#1A0B3E', '#0E0428']} style={s.header}>
+      <LinearGradient colors={['#1A0B3E', '#0E0428']} style={[s.header, { paddingTop: top + 52 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={26} color={T.white} />
+        </TouchableOpacity>
         <View>
           <Text style={s.title}>🔧 Mentenanță</Text>
           {urgent.length > 0 && <Text style={s.urgentBadge}>⚠️  {urgent.length} acțiuni urgente</Text>}
@@ -244,7 +251,8 @@ export default function MaintenanceScreen() {
 }
 
 const s = StyleSheet.create({
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 52 },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, flexWrap: 'wrap', gap: 8 },
+  backBtn:     { width: '100%', marginBottom: 4 },
   title:       { color: T.white, fontSize: 22, fontWeight: 'bold' },
   urgentBadge: { color: T.red, fontSize: 12, marginTop: 4 },
   addBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config';
 import { T, SHADOW } from '../theme';
@@ -38,6 +40,8 @@ function InfoRow({ icon, iconColor, label, value, last }) {
 }
 
 export default function AccountScreen() {
+  const navigation              = useNavigation();
+  const { top }                 = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
   const [stats, setStats] = useState(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -75,7 +79,10 @@ export default function AccountScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
 
         {/* Hero */}
-        <LinearGradient colors={['#1A0B3E', '#0E0428']} style={s.hero}>
+        <LinearGradient colors={['#1A0B3E', '#0E0428']} style={[s.hero, { paddingTop: top + 52 }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+            <Ionicons name="chevron-back" size={26} color={T.white} />
+          </TouchableOpacity>
           <View style={[s.decoCircle, { width: 240, height: 240, top: -90, right: -70 }]} />
           <View style={[s.decoCircle, { width: 120, height: 120, top: 30, right: 90, opacity: 0.04 }]} />
 
@@ -149,7 +156,8 @@ export default function AccountScreen() {
 }
 
 const s = StyleSheet.create({
-  hero:        { alignItems: 'center', paddingTop: 52, paddingBottom: 32, paddingHorizontal: 24, overflow: 'hidden', position: 'relative' },
+  hero:        { alignItems: 'center', paddingBottom: 32, paddingHorizontal: 24, overflow: 'hidden', position: 'relative' },
+  backBtn:     { position: 'absolute', top: 16, left: 16 },
   decoCircle:  { position: 'absolute', borderRadius: 999, backgroundColor: T.accent, opacity: 0.07 },
   avatarWrap:  { alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   avatarRing:  { position: 'absolute', width: 104, height: 104, borderRadius: 52 },

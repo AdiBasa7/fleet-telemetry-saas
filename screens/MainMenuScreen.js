@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T, SHADOW } from '../theme';
 import { useAuth } from '../context/AuthContext';
 
@@ -95,8 +96,11 @@ function MenuCard({ item, onPress, index }) {
 }
 
 export default function MainMenuScreen() {
-  const navigation = useNavigation();
-  const { user } = useAuth();
+  const navigation  = useNavigation();
+  const { user }    = useAuth();
+  const { top }     = useSafeAreaInsets();
+  // toggle pill = ~38px + 4px paddingTop → lăsăm 16px extra respiro
+  const headerPad   = top + 38 + 4 + 16;
 
   const handlePress = (item) => {
     if (item.id === 'account') {
@@ -108,8 +112,8 @@ export default function MainMenuScreen() {
 
   return (
     <LinearGradient colors={[T.bg, '#0F0328']} style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={['#1A0B3E', '#0E0428']} style={styles.header}>
+      {/* Header — paddingTop dinamic sub toggle pill */}
+      <LinearGradient colors={['#1A0B3E', '#0E0428']} style={[styles.header, { paddingTop: headerPad }]}>
         <View style={styles.headerBadge}>
           <View style={styles.dot} />
           <Text style={styles.headerBadgeText}>LIVE</Text>
@@ -145,7 +149,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 56,
+    paddingTop: 0,
     paddingBottom: 28,
     paddingHorizontal: 24,
     alignItems: 'center',

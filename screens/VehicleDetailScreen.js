@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL, POLLING_INTERVAL_MS } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T, SHADOW } from '../theme';
 
 function EditVehicleModal({ visible, device, token, onClose, onSaved }) {
@@ -139,19 +140,44 @@ const r = StyleSheet.create({
   highlight: { fontSize: 16, fontWeight: 'bold', color: T.accent },
 });
 
+// Calculează combustibilul în litri dacă tankCapacityL e setat pe device
+function fuelLiters(pct, tankL) {
+  if (pct == null || !tankL) return null;
+  return ((pct / 100) * tankL).toFixed(1);
+}
+
+// Redă starea ușii ca text + emoji
+function doorLabel(val) {
+  if (val == null) return '—';
+  return val === 1 ? '🔓 Deschisă' : '🔒 Închisă';
+}
+
+// Convertește °C raw → valoare afișabilă (unele LV-CAN200 trimit cu offset -40)
+function tempDisplay(raw) {
+  if (raw == null) return '—';
+  return `${raw} °C`;
+}
+
 export default function VehicleDetailScreen({ route, navigation }) {
+  const { top }          = useSafeAreaInsets();
   const { device: init } = route.params;
   const { token }        = useAuth();
   const [device,    setDevice]    = useState(init);
   const [latest,    setLatest]    = useState(null);
   const [score,     setScore]     = useState(null);
   const [editModal, setEditModal] = useState(false);
+  // Date CAN live — actualizate atât din polling cât și din Socket.IO
+  const [canData,   setCanData]   = useState(init.lastCanData || {});
 
   const fetchDetails = async () => {
     try {
       const res  = await fetch(`${API_BASE_URL}/devices/${init.imei}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
-      if (json.success) { setDevice(json.data); setLatest(json.data.latestRecord); }
+      if (json.success) {
+        setDevice(json.data);
+        setLatest(json.data.latestRecord);
+        if (json.data.lastCanData) setCanData(json.data.lastCanData);
+      }
     } catch {}
   };
 
@@ -166,7 +192,24 @@ export default function VehicleDetailScreen({ route, navigation }) {
   useEffect(() => {
     fetchDetails(); fetchScore();
     const iv = setInterval(fetchDetails, POLLING_INTERVAL_MS);
-    return () => clearInterval(iv);
+
+    // Abonare Socket.IO pentru date CAN în timp real
+    const prevHandler = global.onDeviceUpdate;
+    global.onDeviceUpdate = (data) => {
+      if (prevHandler) prevHandler(data);
+      if (data.imei === init.imei && data.can) {
+        setCanData(prev => {
+          const merged = { ...prev };
+          Object.entries(data.can).forEach(([k, v]) => { if (v !== null) merged[k] = v; });
+          return merged;
+        });
+      }
+    };
+
+    return () => {
+      clearInterval(iv);
+      global.onDeviceUpdate = prevHandler;
+    };
   }, []);
 
   const pos = device.lastPosition || {};
@@ -191,7 +234,10 @@ export default function VehicleDetailScreen({ route, navigation }) {
         )}
 
         {/* Header */}
-        <LinearGradient colors={['#1A0B3E', '#0E0428']} style={s.header}>
+        <LinearGradient colors={['#1A0B3E', '#0E0428']} style={[s.header, { paddingTop: top + 52 }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+            <Ionicons name="chevron-back" size={26} color={T.white} />
+          </TouchableOpacity>
           <Text style={s.plate}>{device.vehicle?.licensePlate || 'Necunoscut'}</Text>
           <Text style={s.makeModel}>
             {device.vehicle?.make !== 'Necunoscut' ? device.vehicle.make : ''}
@@ -241,6 +287,78 @@ export default function VehicleDetailScreen({ route, navigation }) {
           {io.external_voltage_mV != null && <Row label="Tensiune baterie" value={`${(io.external_voltage_mV/1000).toFixed(2)} V`} valueColor={lowBattery ? T.red : T.green} />}
         </View>
 
+        {/* Telemetrie CAN (LV-CAN200) */}
+        {(canData.fuel_level_pct != null || canData.odometer_m != null ||
+          canData.coolant_temp_c != null || canData.oil_temp_c != null) && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>⛽ Telemetrie CAN — Alfa Romeo 159</Text>
+
+            {canData.fuel_level_pct != null && (
+              <Row
+                label="Combustibil"
+                value={
+                  fuelLiters(canData.fuel_level_pct, device.tankCapacityL)
+                    ? `${canData.fuel_level_pct}%  (${fuelLiters(canData.fuel_level_pct, device.tankCapacityL)} L)`
+                    : `${canData.fuel_level_pct}%`
+                }
+                highlight
+                valueColor={
+                  canData.fuel_level_pct < 10 ? T.red
+                  : canData.fuel_level_pct < 25 ? T.orange
+                  : T.green
+                }
+              />
+            )}
+
+            {canData.odometer_m != null && (
+              <Row
+                label="Odometru total"
+                value={`${(canData.odometer_m / 1000).toLocaleString('ro-RO', { maximumFractionDigits: 0 })} km`}
+              />
+            )}
+
+            {canData.coolant_temp_c != null && (
+              <Row
+                label="Temp. răcire"
+                value={tempDisplay(canData.coolant_temp_c)}
+                valueColor={
+                  canData.coolant_temp_c > 105 ? T.red
+                  : canData.coolant_temp_c > 95  ? T.orange
+                  : T.green
+                }
+              />
+            )}
+
+            {canData.oil_temp_c != null && (
+              <Row
+                label="Temp. ulei"
+                value={tempDisplay(canData.oil_temp_c)}
+                valueColor={canData.oil_temp_c > 130 ? T.red : T.green}
+              />
+            )}
+
+            {/* Uși — afișate doar dacă există date */}
+            {(canData.door_fl != null || canData.door_fr != null ||
+              canData.door_rl != null || canData.door_rr != null ||
+              canData.trunk_open != null) && (
+              <>
+                <Text style={[s.cardTitle, { marginTop: 10, fontSize: 12, color: T.muted }]}>Stare uși</Text>
+                {canData.door_fl   != null && <Row label="Față stânga"  value={doorLabel(canData.door_fl)}  valueColor={canData.door_fl  ? T.orange : T.green} />}
+                {canData.door_fr   != null && <Row label="Față dreapta" value={doorLabel(canData.door_fr)}  valueColor={canData.door_fr  ? T.orange : T.green} />}
+                {canData.door_rl   != null && <Row label="Spate stânga" value={doorLabel(canData.door_rl)}  valueColor={canData.door_rl  ? T.orange : T.green} />}
+                {canData.door_rr   != null && <Row label="Spate dreapta"value={doorLabel(canData.door_rr)}  valueColor={canData.door_rr  ? T.orange : T.green} />}
+                {canData.trunk_open!= null && <Row label="Portbagaj"    value={doorLabel(canData.trunk_open)} valueColor={canData.trunk_open ? T.orange : T.green} />}
+              </>
+            )}
+
+            {canData.updatedAt && (
+              <Text style={{ fontSize: 10, color: T.muted2, marginTop: 8, textAlign: 'right' }}>
+                Actualizat: {new Date(canData.updatedAt).toLocaleTimeString('ro-RO')}
+              </Text>
+            )}
+          </View>
+        )}
+
         {/* Scor conducere */}
         <View style={s.card}>
           <Text style={s.cardTitle}>🏆 Scor Conducere (7 zile)</Text>
@@ -277,6 +395,7 @@ const s = StyleSheet.create({
   banner:    { margin: 12, marginBottom: 0, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: T.orange + '44', backgroundColor: '#fb923c11' },
   bannerTxt: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   header:    { padding: 24, alignItems: 'center' },
+  backBtn:   { position: 'absolute', top: 16, left: 16 },
   plate:     { color: T.white, fontSize: 28, fontWeight: 'bold', letterSpacing: 2 },
   makeModel: { color: T.muted, fontSize: 13, marginTop: 2 },
   imei:      { color: T.muted2, fontSize: 11, marginTop: 4 },

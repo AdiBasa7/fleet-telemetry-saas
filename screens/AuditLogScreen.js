@@ -21,6 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T, SHADOW } from '../theme';
 
 // ── Configurare vizuală per entitate ─────────────────
@@ -97,7 +99,9 @@ function FilterChip({ label, active, onPress }) {
 }
 
 export default function AuditLogScreen() {
-  const { token } = useAuth();
+  const navigation = useNavigation();
+  const { top }    = useSafeAreaInsets();
+  const { token }  = useAuth();
   const [entries, setEntries]     = useState([]);
   const [filter, setFilter]       = useState(null);
   const [page, setPage]           = useState(1);
@@ -151,7 +155,10 @@ export default function AuditLogScreen() {
   return (
     <View style={s.container}>
       {/* Header gradient */}
-      <LinearGradient colors={T.grad} style={s.header}>
+      <LinearGradient colors={T.grad} style={[s.header, { paddingTop: top + 52 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 4 }}>
+          <Ionicons name="chevron-back" size={26} color={T.white} />
+        </TouchableOpacity>
         <Ionicons name="shield-checkmark-outline" size={22} color={T.white} />
         <Text style={s.headerTitle}>Jurnal de activitate</Text>
       </LinearGradient>
@@ -207,7 +214,7 @@ const s = StyleSheet.create({
     alignItems:     'center',
     gap:            10,
     paddingHorizontal: 20,
-    paddingVertical:   16,
+    paddingBottom:     16,
   },
   headerTitle: { color: T.white, fontSize: 17, fontWeight: '700' },
 

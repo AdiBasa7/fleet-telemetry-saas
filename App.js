@@ -1,9 +1,9 @@
-/**
- * ============================================================
- *  Fleet Telemetry — Racing HUD Premium
- *  Concept: Floating Glassmorphism Tab Bar + Video Background
- *  4 tabs: Acasă · Hartă · Analiză · Flotă
- * ============================================================
+/*
+ * Project: Sistem Integrat de Telemetrie Auto
+ * Author: Basa Adrian
+ * University: Universitatea Politehnica Timișoara (UPT)
+ * Faculty: ETC-TI
+ * Year: 2026
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { BlurView }           from 'expo-blur';
 import { Ionicons }           from '@expo/vector-icons';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator }     from '@react-navigation/stack';
@@ -22,7 +23,7 @@ import VideoBackground        from './components/VideoBackground';
 import IntroScreen            from './components/IntroScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// ── Screens ───────────────────────────────────────────
+// Screens
 import FleetMapScreen      from './screens/FleetMapScreen';
 import VehicleDetailScreen from './screens/VehicleDetailScreen';
 import RouteHistoryScreen  from './screens/RouteHistoryScreen';
@@ -36,24 +37,29 @@ import TripsScreen         from './screens/TripsScreen';
 import MaintenanceScreen   from './screens/MaintenanceScreen';
 import CockpitScreen       from './screens/CockpitScreen';
 import AuditLogScreen      from './screens/AuditLogScreen';
-import RpmReportScreen    from './screens/RpmReportScreen';
+import RpmReportScreen     from './screens/RpmReportScreen';
+import CanTelemetryScreen  from './screens/CanTelemetryScreen';
+import DiagnosticHubScreen from './screens/DiagnosticHubScreen';
+import LiveDiagDashboard   from './screens/LiveDiagDashboard';
+import DTCScreen           from './screens/DTCScreen';
+import { AppModeProvider, useAppMode, APP_MODES } from './context/AppModeContext';
 import { useSecurityGuard } from './hooks/useSecurityGuard';
 
-// ── Navigatori ────────────────────────────────────────
+// Navigators
 const Tab       = createBottomTabNavigator();
 const Stack     = createStackNavigator();
 const AuthStack = createStackNavigator();
 
-// ── Design tokens ─────────────────────────────────────
-const NEON_ORANGE   = '#FF5E00';
-const INACTIVE      = 'rgba(255,255,255,0.35)';
-const BAR_H         = 70;
-const BAR_BOTTOM    = 14;
-const BAR_SIDE      = 20;
-const BAR_RADIUS    = 28;
-const CONTAINER_H   = BAR_H + BAR_BOTTOM;
+// Design tokens — glassmorphism tab bar
+const NEON_ORANGE = '#FF5E00';
+const INACTIVE    = 'rgba(255,255,255,0.35)';
+const BAR_H       = 70;
+const BAR_BOTTOM  = 14;
+const BAR_SIDE    = 20;
+const BAR_RADIUS  = 28;
+const CONTAINER_H = BAR_H + BAR_BOTTOM;
 
-// ── Push notifications ────────────────────────────────
+// Expo Notifications (optional dep — graceful fallback)
 let Notifications;
 try { Notifications = require('expo-notifications'); } catch {}
 
@@ -81,16 +87,9 @@ async function registerForPushNotifications(token) {
   } catch (e) { if (__DEV__) console.warn('Push registration:', e.message); }
 }
 
-// ── Header options comune ─────────────────────────────
-const HO = {
-  headerStyle:         { backgroundColor: 'rgba(8, 2, 20, 0.92)' },
-  headerTintColor:     NEON_ORANGE,
-  headerTitleStyle:    { fontWeight: 'bold', color: '#FFFFFF', fontSize: 16 },
-  headerShadowVisible: false,
-  cardStyle:           { backgroundColor: 'transparent' },
-};
+const HO = { headerShown: false, cardStyle: { backgroundColor: 'transparent' } };
 
-// ── Auth ──────────────────────────────────────────────
+// Auth
 function AuthNavigator() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
@@ -100,10 +99,9 @@ function AuthNavigator() {
   );
 }
 
-// ── Tab 1 · Acasă ─────────────────────────────────────
-// MainMenuScreen direct, fără stack extra
+// Tab 1 · Acasă — MainMenuScreen (no extra stack)
 
-// ── Tab 2 · Hartă ─────────────────────────────────────
+// Tab 2 · Hartă
 function MapStack() {
   return (
     <Stack.Navigator screenOptions={HO} sceneContainerStyle={{ backgroundColor: '#07010F' }}>
@@ -119,11 +117,11 @@ function MapStack() {
   );
 }
 
-// ── Tab 3 · Analiză ───────────────────────────────────
+// Tab 3 · Analiză
 function AnalysisStack() {
   return (
     <Stack.Navigator screenOptions={HO} sceneContainerStyle={{ backgroundColor: '#07010F' }}>
-      <Stack.Screen name="Trips"    component={TripsScreen}    options={{ title: '📊  Analiză & Jurnal' }} />
+      <Stack.Screen name="Trips"    component={TripsScreen}    options={{ headerShown: false }} />
       <Stack.Screen name="Alerts"    component={AlertsScreen}    options={{ title: '🚨  Alerte' }} />
       <Stack.Screen name="AuditLog"  component={AuditLogScreen}  options={{ title: '🛡️   Jurnal activitate' }} />
       <Stack.Screen name="RpmReport" component={RpmReportScreen} options={{ title: '📊  Raport Turații' }} />
@@ -131,7 +129,7 @@ function AnalysisStack() {
   );
 }
 
-// ── Tab 4 · Flotă ─────────────────────────────────────
+// Tab 4 · Flotă
 function FleetStack() {
   return (
     <Stack.Navigator screenOptions={HO} sceneContainerStyle={{ backgroundColor: '#07010F' }}>
@@ -157,71 +155,164 @@ function FleetStack() {
           ),
         })}
       />
-      <Stack.Screen name="Maintenance" component={MaintenanceScreen} options={{ title: '🔧  Mentenanță' }} />
-      <Stack.Screen name="Account"     component={AccountScreen}     options={{ title: '👤  Contul meu' }} />
-      <Stack.Screen name="Cockpit"     component={CockpitScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="Maintenance"   component={MaintenanceScreen}   options={{ title: '🔧  Mentenanță' }} />
+      <Stack.Screen name="Account"       component={AccountScreen}       options={{ title: '👤  Contul meu' }} />
+      <Stack.Screen name="Cockpit"       component={CockpitScreen}       options={{ headerShown: false }} />
       <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen}
         options={({ route }) => ({ title: route.params?.device?.vehicle?.licensePlate || 'Detalii' })} />
     </Stack.Navigator>
   );
 }
 
-// ── Definiții tab-uri ─────────────────────────────────
-const TABS = [
-  { name: 'Acasă',   icon: 'home-outline',      iconFocused: 'home',       color: NEON_ORANGE },
-  { name: 'Hartă',   icon: 'navigate-outline',  iconFocused: 'navigate',   color: NEON_ORANGE },
-  { name: 'Analiză', icon: 'bar-chart-outline', iconFocused: 'bar-chart',  color: NEON_ORANGE },
-  { name: 'Flotă',   icon: 'car-outline',       iconFocused: 'car',        color: NEON_ORANGE },
+// Diagnosis mode — separate tab navigator with purple accent
+const DiagTab   = createBottomTabNavigator();
+const DiagStack = createStackNavigator();
+
+function DiagMainStack() {
+  return (
+    <DiagStack.Navigator screenOptions={HO} sceneContainerStyle={{ backgroundColor: '#07010F' }}>
+      <DiagStack.Screen name="DiagHub"           component={DiagnosticHubScreen}  options={{ headerShown: false }} />
+      <DiagStack.Screen name="LiveDiagDashboard" component={LiveDiagDashboard}    options={{ title: '📊  Dashboard Live', headerShown: false }} />
+      <DiagStack.Screen name="DTCScreen"         component={DTCScreen}            options={{ title: '⚠  Coduri DTC' }} />
+      <DiagStack.Screen name="CanTelemetry"      component={CanTelemetryScreen}   options={{ title: '📡  Telemetrie CAN' }} />
+      <DiagStack.Screen name="DiagSessions"      component={CanTelemetryScreen}   options={{ title: '📋  Sesiuni (în curând)' }} />
+      <DiagStack.Screen name="ReliabilityReport" component={CanTelemetryScreen}   options={{ title: '📈  Fiabilitate (în curând)' }} />
+    </DiagStack.Navigator>
+  );
+}
+
+const DIAG_TABS = [
+  { name: 'Diagnoză',  icon: 'flask-outline',     iconFocused: 'flask',      color: '#A855F7' },
+  { name: 'Dashboard', icon: 'pulse-outline',      iconFocused: 'pulse',      color: '#A855F7' },
+  { name: 'DTC',       icon: 'bug-outline',        iconFocused: 'bug',        color: '#A855F7' },
+  { name: 'Sesiuni',   icon: 'clipboard-outline',  iconFocused: 'clipboard',  color: '#A855F7' },
 ];
 
-// ── Custom Tab Bar — Racing HUD ───────────────────────
-function RacingTabBar({ state, navigation }) {
+function DiagTabBar({ state, navigation }) {
+  const NEON_PURPLE = '#A855F7';
   return (
     <View style={tb.container} pointerEvents="box-none">
-
-      {/* ── Bara de sticlă (BlurView) ─────────────── */}
-      <View style={tb.bar}>
+      <View style={[tb.bar, { borderColor: 'rgba(168,85,247,0.18)' }]}>
         <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-        {/* Overlay semi-transparent suplimentar pentru contrast */}
         <View style={tb.barDim} />
-        {/* Accent neon: linie subțire la mijlocul barei (sus) */}
-        <View style={tb.accentLine} />
+        <View style={[tb.accentLine, { backgroundColor: `${NEON_PURPLE}66` }]} />
       </View>
-
-      {/* ── Tab items ──────────────────────────────── */}
       <View style={tb.row} pointerEvents="box-none">
         {state.routes.map((route, i) => {
-          const def     = TABS[i];
+          const def     = DIAG_TABS[i] || DIAG_TABS[0];
           const focused = state.index === i;
-          const onPress = () => navigation.navigate(route.name);
           const color   = focused ? def.color : INACTIVE;
-
           return (
             <TouchableOpacity
               key={route.key}
               style={tb.tabItem}
-              onPress={onPress}
+              onPress={() => navigation.navigate(route.name)}
               activeOpacity={0.7}
             >
-              <View style={[
-                tb.iconWrap,
-                focused && {
-                  shadowColor:   def.color,
-                  shadowOpacity: 1,
-                  shadowRadius:  12,
-                  shadowOffset:  { width: 0, height: 0 },
-                  elevation:     10,
-                },
-              ]}>
-                <Ionicons
-                  name={focused ? def.iconFocused : def.icon}
-                  size={25}
-                  color={color}
-                />
+              <View style={[tb.iconWrap, focused && {
+                shadowColor: def.color, shadowOpacity: 1, shadowRadius: 12,
+                shadowOffset: { width: 0, height: 0 }, elevation: 10,
+              }]}>
+                <Ionicons name={focused ? def.iconFocused : def.icon} size={25} color={color} />
               </View>
-              {focused && (
-                <View style={[tb.activeDot, { backgroundColor: def.color }]} />
-              )}
+              {focused && <View style={[tb.activeDot, { backgroundColor: def.color }]} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function DiagnosisApp({ diagTopPad = 96 }) {
+  return (
+    <DiagTab.Navigator tabBar={props => <DiagTabBar {...props} />} sceneContainerStyle={{ backgroundColor: '#07010F' }} screenOptions={{ headerShown: false }}>
+      <DiagTab.Screen name="Diagnoză"  component={DiagMainStack}     initialParams={{ diagTopPad }} />
+      <DiagTab.Screen name="Dashboard" component={LiveDiagDashboard} initialParams={{ diagTopPad }} />
+      <DiagTab.Screen name="DTC"       component={DTCScreen}         initialParams={{ diagTopPad }} />
+      <DiagTab.Screen name="Sesiuni"   component={CanTelemetryScreen} initialParams={{ diagTopPad }} />
+    </DiagTab.Navigator>
+  );
+}
+
+// Mode toggle pill (TRACKING / DIAGNOSIS) — anchored to safe area top
+const TOGGLE_PILL_H = 38;
+
+function ModeToggle() {
+  const { top }  = useSafeAreaInsets();
+  const { mode, toggleMode } = useAppMode();
+  const isTracking = mode === APP_MODES.TRACKING;
+  return (
+    <View style={[mt.wrapper, { top }]} pointerEvents="box-none">
+      <View style={mt.pill}>
+        <TouchableOpacity
+          style={[mt.btn, isTracking && mt.btnActive]}
+          onPress={() => !isTracking && toggleMode()}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="navigate" size={13} color={isTracking ? '#FF5E00' : 'rgba(255,255,255,0.35)'} />
+          <Text style={[mt.btnText, isTracking && { color: '#FF5E00' }]}>TRACKING</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[mt.btn, !isTracking && mt.btnActiveDiag]}
+          onPress={() => isTracking && toggleMode()}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="flask" size={13} color={!isTracking ? '#A855F7' : 'rgba(255,255,255,0.35)'} />
+          <Text style={[mt.btnText, !isTracking && { color: '#A855F7' }]}>DIAGNOSIS</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const mt = StyleSheet.create({
+  wrapper:       { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 999, paddingTop: 4 },
+  pill:          { flexDirection: 'row', backgroundColor: 'rgba(3,0,10,0.88)', borderRadius: 24, padding: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', gap: 2 },
+  btn:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+  btnActive:     { backgroundColor: 'rgba(255,94,0,0.15)', borderWidth: 1, borderColor: 'rgba(255,94,0,0.3)' },
+  btnActiveDiag: { backgroundColor: 'rgba(168,85,247,0.15)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)' },
+  btnText:       { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+});
+
+const TABS = [
+  { name: 'Acasă',   icon: 'home-outline',      iconFocused: 'home',      color: NEON_ORANGE },
+  { name: 'Hartă',   icon: 'navigate-outline',  iconFocused: 'navigate',  color: NEON_ORANGE },
+  { name: 'Analiză', icon: 'bar-chart-outline', iconFocused: 'bar-chart', color: NEON_ORANGE },
+  { name: 'Flotă',   icon: 'car-outline',       iconFocused: 'car',       color: NEON_ORANGE },
+];
+
+// Racing HUD tab bar — glassmorphism floating pill
+function RacingTabBar({ state, navigation }) {
+  return (
+    <View style={tb.container} pointerEvents="box-none">
+      <View style={tb.bar}>
+        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={tb.barDim} />
+        <View style={tb.accentLine} />
+      </View>
+      <View style={tb.row} pointerEvents="box-none">
+        {state.routes.map((route, i) => {
+          const def     = TABS[i];
+          const focused = state.index === i;
+          const color   = focused ? def.color : INACTIVE;
+          return (
+            <TouchableOpacity
+              key={route.key}
+              style={tb.tabItem}
+              onPress={() => navigation.navigate(route.name)}
+              activeOpacity={0.7}
+            >
+              <View style={[tb.iconWrap, focused && {
+                shadowColor:   def.color,
+                shadowOpacity: 1,
+                shadowRadius:  12,
+                shadowOffset:  { width: 0, height: 0 },
+                elevation:     10,
+              }]}>
+                <Ionicons name={focused ? def.iconFocused : def.icon} size={25} color={color} />
+              </View>
+              {focused && <View style={[tb.activeDot, { backgroundColor: def.color }]} />}
             </TouchableOpacity>
           );
         })}
@@ -231,97 +322,55 @@ function RacingTabBar({ state, navigation }) {
 }
 
 const tb = StyleSheet.create({
-  container: {
-    height:   CONTAINER_H,
-    overflow: 'visible',
-  },
-
-  // Bara vizuală glassmorphism
+  container: { height: CONTAINER_H, overflow: 'visible' },
   bar: {
-    position:     'absolute',
-    bottom:       BAR_BOTTOM,
-    left:         BAR_SIDE,
-    right:        BAR_SIDE,
-    height:       BAR_H,
-    borderRadius: BAR_RADIUS,
-    overflow:     'hidden',
-    borderWidth:  1,
-    borderColor:  'rgba(255, 255, 255, 0.08)',
+    position: 'absolute', bottom: BAR_BOTTOM, left: BAR_SIDE, right: BAR_SIDE,
+    height: BAR_H, borderRadius: BAR_RADIUS, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  barDim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 0, 10, 0.50)',
-  },
-  // Linie neon subțire la mijlocul barei (accent vizual)
+  barDim:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(3, 0, 10, 0.50)' },
   accentLine: {
-    position:        'absolute',
-    top:             0,
-    left:            '20%',
-    right:           '20%',
-    height:          1,
-    backgroundColor: `${NEON_ORANGE}66`,
-    borderRadius:    1,
+    position: 'absolute', top: 0, left: '20%', right: '20%',
+    height: 1, backgroundColor: `${NEON_ORANGE}66`, borderRadius: 1,
   },
-
-  // Rândul de items — suprapus peste bară
   row: {
-    position:      'absolute',
-    bottom:        BAR_BOTTOM,
-    left:          BAR_SIDE,
-    right:         BAR_SIDE,
-    height:        BAR_H,
-    flexDirection: 'row',
-    alignItems:    'center',
+    position: 'absolute', bottom: BAR_BOTTOM, left: BAR_SIDE, right: BAR_SIDE,
+    height: BAR_H, flexDirection: 'row', alignItems: 'center',
   },
-
-  // Tab normal
-  tabItem: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
-    height:         BAR_H,
-  },
-  iconWrap: {
-    alignItems:     'center',
-    justifyContent: 'center',
-    width:          44,
-    height:         44,
-    borderRadius:   22,
-  },
-  activeDot: {
-    width:        4,
-    height:       4,
-    borderRadius: 2,
-    marginTop:    3,
-  },
-
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', height: BAR_H },
+  iconWrap: { alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 22 },
+  activeDot: { width: 4, height: 4, borderRadius: 2, marginTop: 3 },
 });
 
-// ── Main App ──────────────────────────────────────────
+// Main app shell — switches between TRACKING and DIAGNOSIS navigators
 function MainApp() {
-  // Activează: screenshot prevention + root/jailbreak detection
   useSecurityGuard();
+  const { mode } = useAppMode();
+  const { top }  = useSafeAreaInsets();
+  // DIAGNOSIS screens need padding = safe area top + toggle pill height + gap
+  const diagTopPad = top + TOGGLE_PILL_H + 10;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#07010F' }}>
-      {/* Video loop full-screen în fundal — apare pe toate ecranele */}
       <VideoBackground />
-
-      <Tab.Navigator
-        tabBar={props => <RacingTabBar {...props} />}
-        sceneContainerStyle={{ backgroundColor: '#07010F' }}
-        screenOptions={{ headerShown: false }}
-      >
-        <Tab.Screen name="Acasă"   component={MainMenuScreen} />
-        <Tab.Screen name="Hartă"   component={MapStack} />
-        <Tab.Screen name="Analiză" component={AnalysisStack} />
-        <Tab.Screen name="Flotă"   component={FleetStack} />
-      </Tab.Navigator>
+      {mode === APP_MODES.TRACKING && (
+        <Tab.Navigator
+          tabBar={props => <RacingTabBar {...props} />}
+          sceneContainerStyle={{ backgroundColor: '#07010F' }}
+          screenOptions={{ headerShown: false }}
+        >
+          <Tab.Screen name="Acasă"   component={MainMenuScreen} />
+          <Tab.Screen name="Hartă"   component={MapStack} />
+          <Tab.Screen name="Analiză" component={AnalysisStack} />
+          <Tab.Screen name="Flotă"   component={FleetStack} />
+        </Tab.Navigator>
+      )}
+      {mode === APP_MODES.DIAGNOSIS && <DiagnosisApp diagTopPad={diagTopPad} />}
+      <ModeToggle />
     </View>
   );
 }
 
-// ── Root Navigator ────────────────────────────────────
 function RootNavigator() {
   const { user, loading, token } = useAuth();
   const socketRef = useRef(null);
@@ -330,8 +379,8 @@ function RootNavigator() {
     if (!user || !token) return;
     registerForPushNotifications(token);
     const socket = socketIO(WS_URL, { transports: ['websocket'], autoConnect: true });
-    socket.on('connect',    () => { if (__DEV__) console.log('⚡ WS conectat'); });
-    socket.on('disconnect', () => { if (__DEV__) console.log('⚡ WS deconectat'); });
+    socket.on('connect',       () => { if (__DEV__) console.log('⚡ WS conectat'); });
+    socket.on('disconnect',    () => { if (__DEV__) console.log('⚡ WS deconectat'); });
     socket.on('device_update', data => { if (global.onDeviceUpdate) global.onDeviceUpdate(data); });
     socketRef.current = socket;
     return () => socket.disconnect();
@@ -361,13 +410,16 @@ const NAV_THEME = {
 
 export default function App() {
   const [introDone, setIntroDone] = useState(false);
-
   return (
-    <AuthProvider>
-      <NavigationContainer theme={NAV_THEME}>
-        <RootNavigator />
-      </NavigationContainer>
-      {!introDone && <IntroScreen onDone={() => setIntroDone(true)} />}
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AppModeProvider>
+        <AuthProvider>
+          <NavigationContainer theme={NAV_THEME}>
+            <RootNavigator />
+          </NavigationContainer>
+          {!introDone && <IntroScreen onDone={() => setIntroDone(true)} />}
+        </AuthProvider>
+      </AppModeProvider>
+    </SafeAreaProvider>
   );
 }
